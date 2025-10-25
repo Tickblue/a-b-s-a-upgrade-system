@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Login | A-b-s-a</title>
+  <style>
+    :root{--accent:#d50032;--bg:#f4f4f4}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh}
+    .card{background:#fff;padding:22px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.08);width:360px;max-width:94%}
+    h2{margin:0 0 14px;color:var(--accent);text-align:center}
+    label{display:block;font-weight:600;margin:10px 0 6px}
+    input[type="email"],input[type="password"],input[type="text"]{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box}
+    button{width:100%;padding:10px;margin-top:14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer}
+    .muted{font-size:13px;color:#666;text-align:center;margin-top:10px}
+    .row{display:flex;gap:8px}
+    .small-btn{flex:1;padding:8px;background:#222;color:#fff;border:none;border-radius:6px;cursor:pointer}
+    .message{margin-top:10px;font-weight:600;text-align:center}
+    .tabs{display:flex;gap:8px;margin-bottom:10px}
+    .tab{flex:1;padding:8px;border-radius:6px;background:#eee;border:none;cursor:pointer}
+    .tab.active{background:var(--accent);color:#fff}
+    .hint{font-size:12px;color:#444;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Admin Login</h2>
+
+    <div class="tabs" role="tablist">
+      <button id="tab-login" class="tab active" type="button">Login</button>
+      <button id="tab-create" class="tab" type="button">Create Admin</button>
+    </div>
+
+    <div id="form-login">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+      <button id="loginBtn" type="button">Sign In</button>
+      <div class="muted">Only users marked under <code>admins/{uid}: true</code> in the DB will be allowed access.</div>
+    </div>
+
+    <div id="form-create" style="display:none;">
+      <label for="newEmail">Admin email</label>
+      <input id="newEmail" type="email" />
+      <label for="newPassword">Password</label>
+      <input id="newPassword" type="password" />
+      <label for="ownerKey">Owner key (required)</label>
+      <input id="ownerKey" type="text" placeholder="Enter owner key" />
+      <button id="createBtn" type="button">Create Admin Account</button>
+      <div class="hint">Creating an admin account writes <code>admins/{uid}: true</code> in the database. Protect the owner key.</div>
+    </div>
+
+    <div id="msg" class="message" aria-live="polite"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+
+    // ===== FIREBASE CONFIG - DO NOT CHANGE =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyDtJstcWHSwJVPogm-MXAehNR4FBhh8Iuo",
+      authDomain: "a-b-s-a-upgrade-system.firebaseapp.com",
+      databaseURL: "https://a-b-s-a-upgrade-system-default-rtdb.firebaseio.com",
+      projectId: "a-b-s-a-upgrade-system",
+      storageBucket: "a-b-s-a-upgrade-system.firebasestorage.app",
+      messagingSenderId: "618721346269",
+      appId: "1:618721346269:web:2548672e789231e4e95134"
+    };
+
+    // ===== OWNER KEY SET AS REQUESTED =====
+    const OWNER_KEY = "ABSA-SECURE-951";
+
+    // ===================================================================
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const msgEl = document.getElementById('msg');
+
+    // UI elements
+    const tabLogin = document.getElementById('tab-login');
+    const tabCreate = document.getElementById('tab-create');
+    const formLogin = document.getElementById('form-login');
+    const formCreate = document.getElementById('form-create');
+
+    tabLogin.addEventListener('click', () => { 
+      tabLogin.classList.add('active'); 
+      tabCreate.classList.remove('active'); 
+      formLogin.style.display='block'; 
+      formCreate.style.display='none'; 
+      msgEl.textContent=''; 
+    });
+
+    tabCreate.addEventListener('click', () => { 
+      tabCreate.classList.add('active'); 
+      tabLogin.classList.remove('active'); 
+      formCreate.style.display='block'; 
+      formLogin.style.display='none'; 
+      msgEl.textContent=''; 
+    });
+
+    function showMsg(text, color='red') { 
+      msgEl.textContent = text; 
+      msgEl.style.color = color; 
+    }
+
+    // LOGIN
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      showMsg("Signing in...", "#444");
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) { showMsg("Email and password required."); return; }
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+        const adminSnap = await get(ref(db, `admins/${uid}`));
+        if (adminSnap.exists() && adminSnap.val() === true) {
+          showMsg("Access granted. Redirecting...", "green");
+          setTimeout(() => window.location.href = "dashboard.html", 700);
+        } else {
+          await signOut(auth);
+          showMsg("Access denied. This account is not marked as admin.", "red");
+        }
+      } catch (err) {
+        showMsg("Sign in failed: " + (err.message || err.code));
+      }
+    });
+
+    // CREATE ADMIN
+    document.getElementById('createBtn').addEventListener('click', async () => {
+      showMsg("Creating admin...", "#444");
+      const email = document.getElementById('newEmail').value.trim();
+      const password = document.getElementById('newPassword').value;
+      const ownerKey = document.getElementById('ownerKey').value.trim();
+      if (!email || !password || !ownerKey) { showMsg("All fields are required."); return; }
+      if (ownerKey !== OWNER_KEY) { showMsg("Invalid owner key."); return; }
+
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCred.user.uid;
+        await set(ref(db, `admins/${uid}`), true);
+        showMsg("Admin account created successfully. Redirecting to login...", "green");
+        await signOut(auth);
+        setTimeout(() => {
+          tabLogin.click();
+          document.getElementById('email').value = email;
+        }, 900);
+      } catch (err) {
+        showMsg("Error: " + (err.message || err.code));
+      }
+    });
+  </script>
+</body>
+</html>
